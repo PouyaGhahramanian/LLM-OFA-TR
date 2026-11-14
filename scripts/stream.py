@@ -85,6 +85,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bs = args.batch_size or MODELS[args.model]["batch_size"]
     run_name = f"{args.setting}_{args.model}_{args.config}{args.tag}"
+    if args.limit:  # smoke tests never overwrite (or count as) a full run
+        run_name += f"_limit{args.limit}"
     out = args.out_dir / run_name
     out.mkdir(parents=True, exist_ok=True)
 

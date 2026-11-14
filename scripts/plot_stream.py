@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.dates as mdates
+from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter, NullLocator
 import numpy as np
 import pandas as pd
 
@@ -62,24 +63,37 @@ def main():
                     drifts.append(dr)
             if per_model:
                 curves[c] = np.mean(per_model, axis=0)
+        smoothed = {}
         for c in CONFIGS:
             if c not in curves:
                 continue
-            y = pd.Series(curves[c]).rolling(args.smooth, center=True, min_periods=1).mean()
-            acc_ax.plot(dates, y, color=SERIES[c], label=SERIES_LABEL[c])
-            acc_ax.annotate(SERIES_LABEL[c], (dates[-1], y.iloc[-1]), xytext=(4, 0), textcoords="offset points",
-                            va="center", fontsize=7.5, color=INK["secondary"])
+            smoothed[c] = pd.Series(curves[c]).rolling(args.smooth, center=True, min_periods=1).mean()
+            acc_ax.plot(dates, smoothed[c], color=SERIES[c], label=SERIES_LABEL[c])
             table.append(pd.DataFrame({"setting": setting, "config": c, "window_end": dates,
                                        "mean_prequential_accuracy": curves[c]}))
+        # direct end labels only where they do not collide (the legend carries identity otherwise)
+        ends = {c: float(v.iloc[-1]) for c, v in smoothed.items()}
+        lo, hi = acc_ax.get_ylim()
+        gap = 0.05 * (hi - lo)
+        for c, yv in ends.items():
+            if all(abs(yv - o) > gap for k, o in ends.items() if k != c):
+                acc_ax.annotate(SERIES_LABEL[c], (dates[-1], yv), xytext=(4, 0), textcoords="offset points",
+                                va="center", fontsize=7.5, color=INK["secondary"])
         if drifts:
             dmean = pd.Series(np.mean(drifts, axis=0)).rolling(args.smooth, center=True, min_periods=1).mean()
             drift_ax.plot(dates, dmean, color=INK["secondary"], lw=1.4)
-            drift_ax.fill_between(dates, dmean, dmean.min(), color=INK["secondary"], alpha=0.10, lw=0)
             table.append(pd.DataFrame({"setting": setting, "config": "drift(relative)", "window_end": dates,
                                        "mean_prequential_accuracy": np.mean(drifts, axis=0)}))
         acc_ax.set_title(titles[setting], loc="left")
         acc_ax.set_ylabel("Prequential doğruluk (%)" if j == 0 else "")
-        drift_ax.set_ylabel("Kayma puanı\n(göreli)" if j == 0 else "")
+        drift_ax.set_yscale("log")
+        if drifts:
+            span = np.log10(float(np.max(dmean)) / max(float(np.min(dmean)), 1e-12))
+            drift_ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0,) if span > 1.5 else (1.0, 2.0, 5.0)))
+        drift_ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+        drift_ax.yaxis.set_minor_locator(NullLocator())
+        drift_ax.yaxis.set_minor_formatter(NullFormatter())
+        drift_ax.set_ylabel("Kayma puanı\n(göreli, log)" if j == 0 else "")
         drift_ax.set_xlabel("Yıl")
         drift_ax.xaxis.set_major_locator(mdates.YearLocator(2))
         drift_ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))

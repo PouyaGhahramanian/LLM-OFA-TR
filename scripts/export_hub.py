@@ -28,9 +28,10 @@ def label_table(stats):
     return "\n".join(rows)
 
 
-def render_card(stats, args):
+def render_card(stats, args, extra=None):
     card = (REPO / "hub" / "DATASET_CARD.md").read_text(encoding="utf-8")
-    values = {
+    values = dict(extra or {})
+    values.update({
         "N_BENCH": stats["n_benchmark"], "N_DATE_FIX": stats["dates_repaired_day_month_swap"],
         "N_2020": stats["excluded"].get("out_of_range_year", 0), "N_DUP": stats["excluded"].get("duplicate", 0),
         "N_FT": stats["split_sizes"]["finetune"], "N_ST": stats["split_sizes"]["stream"],
@@ -39,7 +40,7 @@ def render_card(stats, args):
         "Y_MEAN": stats["yearly"]["mean"], "COL_SHARE": stats["columns_share"],
         "LABEL_TABLE": label_table(stats), "HF_ID": args.hf_id, "KAGGLE_ID": args.kaggle_id,
         "GITHUB_URL": args.github_url,
-    }
+    })
     # fill {KEY} / {KEY:fmt} placeholders without touching other braces (YAML, BibTeX)
     import re
 
@@ -61,7 +62,8 @@ def main():
     stats = json.loads((REPO / "data" / "stats.json").read_text(encoding="utf-8"))
     bench = pd.read_parquet(REPO / "data" / "thd_temporal.parquet")
     full = pd.read_parquet(REPO / "data" / "thd_temporal_full.parquet")
-    card = render_card(stats, args)
+    card = render_card(stats, args, {"N_CATORIG_BENCH": int(bench["category_original"].nunique()),
+                                     "N_CATORIG_FULL": int(full["category_original"].nunique())})
     lic = REPO / "data" / "LICENSE-THD.txt"
 
     hf = args.out / "hf"

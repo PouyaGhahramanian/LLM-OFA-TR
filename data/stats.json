@@ -1,7 +1,8 @@
 {
   "source": "https://github.com/ogozuacik/turkce-haber-derlemi (MIT, (c) 2020 Ömer Gözüaçık)",
   "n_filtered_original": 81407,
-  "n_raw_original": 110220,
+  "n_raw_original": 110269,
+  "n_raw_unique_links": 110220,
   "dates_repaired_day_month_swap": 29427,
   "dates_other_mismatch": 0,
   "excluded": {
@@ -84,7 +85,7 @@
       "2019": 2446
     }
   },
-  "columns_share": 0.2887,
+  "columns_share": 0.3037,
   "summary_equals_title": 13713,
   "label_map": {
     "Gündem": "Gündem",

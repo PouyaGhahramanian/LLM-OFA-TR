@@ -11,7 +11,8 @@ THD-Temporal keeps the original author's article selection and labels and
   1. restores the original text (title / summary / body) by joining both files on `link`,
   2. repairs publication dates (the filtered file has day/month swapped for dates with day <= 12),
   3. adds a 10-class `label` (Ege, Pazar and Cumartesi -- regional/weekend supplements -- merged into "Diğer"),
-  4. flags invalid dates (1899), the out-of-range partial year 2020 and exact duplicate articles,
+  4. flags invalid dates (1899), articles dated only by the June/July 2020 crawl (mostly Skorer sports articles
+     published ~2009-2019, exact dates unknown) and exact duplicate articles,
   5. defines a chronological benchmark split: `finetune` (1997-2007) and `stream` (2008-2019).
 
 Usage:
@@ -41,6 +42,7 @@ LABEL_MAP = {
     "Ege": "Diğer", "Pazar": "Diğer", "Cumartesi": "Diğer",
 }
 FIRST_YEAR, LAST_YEAR = 1997, 2019
+NON_AUTHOR_SLUGS = {"galeri", "oyun-dunyasi", "teknoloji-haberleri"}  # 3-level paths that are not columnists
 ZERO_WIDTH = re.compile("[​‌‍⁠﻿]")
 
 
@@ -86,10 +88,14 @@ def main():
     raw = pd.read_csv(fetch(args.orig_dir, RAW))
     print(f"filtered: {flt.shape}, raw: {raw.shape}")
 
+    n_raw_rows = len(raw)
     flt = flt.reset_index().rename(columns={"index": "source_row"})
-    raw = raw.drop_duplicates("link", keep="first")
-    df = flt.merge(raw[["link", "news_title", "summary", "news", "date"]], on="link", how="left",
-                   suffixes=("_flt", ""), validate="many_to_one")
+    # a few links occur more than once (25 rows in the filtered file, 49 in the raw scrape): match the i-th
+    # occurrence in the filtered file with the i-th occurrence in the raw scrape
+    flt["occ"] = flt.groupby("link").cumcount()
+    raw = raw.assign(occ=raw.groupby("link").cumcount())
+    df = flt.merge(raw[["link", "occ", "news_title", "summary", "news", "date"]], on=["link", "occ"], how="left",
+                   suffixes=("_flt", ""), validate="one_to_one")
     assert df["news_title"].notna().all(), "some filtered articles have no raw counterpart"
 
     # --- dates: raw dates are dd.mm.yyyy; the filtered file parsed them month-first when day <= 12
@@ -99,6 +105,10 @@ def main():
                & (d_raw.dt.day == d_flt.dt.month) & (d_raw.dt.month == d_flt.dt.day))
     other_mismatch = d_raw.notna() & d_flt.notna() & (d_raw != d_flt) & ~swapped
     date = d_raw.fillna(d_flt)
+
+    # opinion columns: /yazarlar/<author>/<slug> and /<section>/<author>/<slug> (e.g. Cadde, Skorer, Pembenar)
+    parts = df["link"].str.extract(r"^/([^/]+)/([^/]+)/[^/]+$")
+    is_col = (parts[0].eq("yazarlar") | (parts[0].notna() & ~parts[1].isin(NON_AUTHOR_SLUGS))).fillna(False)
 
     out = pd.DataFrame({
         "id": [f"thd-{i:06d}" for i in df["source_row"]],
@@ -113,8 +123,8 @@ def main():
         "category_original": df["category_backup"],
         "link": df["link"],
         "url": BASE_URL + df["link"],
-        "is_column": df["link"].str.startswith("/yazarlar/"),
-        "author": df["link"].str.extract(r"^/yazarlar/([^/]+)/")[0],
+        "is_column": is_col.astype(bool),
+        "author": parts[1].where(is_col),
         "date_repaired": swapped,
     })
     assert out["label"].notna().all(), "unmapped category"
@@ -145,7 +155,8 @@ def main():
     stats = {
         "source": "https://github.com/ogozuacik/turkce-haber-derlemi (MIT, (c) 2020 Ömer Gözüaçık)",
         "n_filtered_original": int(len(flt)),
-        "n_raw_original": int(len(raw)),
+        "n_raw_original": int(n_raw_rows),
+        "n_raw_unique_links": int(raw["link"].nunique()),
         "dates_repaired_day_month_swap": int(swapped.sum()),
         "dates_other_mismatch": int(other_mismatch.sum()),
         "excluded": out["exclusion"].value_counts().to_dict(),

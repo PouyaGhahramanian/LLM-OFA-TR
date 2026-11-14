@@ -9,8 +9,9 @@
 | roberta    | roberta-base                     | TURKCELL/roberta-base-turkish-uncased             |
 | deberta    | microsoft/deberta-base           | microsoft/mdeberta-v3-base (no Turkish DeBERTa)   |
 
-Uncased checkpoints get Turkish-aware lower-casing (I -> ı, İ -> i) because their tokenizers' built-in
-lower-casing maps "İ" to an unknown token / "I" to "i".
+Uncased checkpoints get Turkish-aware lower-casing (I -> ı, İ -> i): the ALBERT tokenizer's own lower-casing maps
+"İ" to "i" + <unk> and "I" to "i", and the TURKCELL RoBERTa tokenizer (byte-level BPE) does no lower-casing at all
+although its vocabulary was learned from lower-cased text.
 Batch sizes follow LLM-OFA: 64 DistilBERT, 32 BERT/RoBERTa, 16 ALBERT/ELECTRA, 8 DeBERTa.
 """
 from transformers import AutoModelForSequenceClassification, AutoTokenizer

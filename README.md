@@ -27,7 +27,7 @@ drift**.
 | Original text | title / summary / body restored from the raw scrape `milliyet_derlem.csv.gz` (joined on `link`, 100% match); the filtered file is lower-cased without digits and punctuation |
 | Dates | day/month swap in the filtered file repaired for 29,427 articles (dates re-parsed from raw `dd.mm.yyyy`) |
 | Labels | 10 classes: `Ege` (regional edition), `Pazar`, `Cumartesi` (weekend supplements) merged into `Diğer` |
-| Exclusions (flagged) | 19 invalid dates (1899), 2,247 articles of the partial year 2020, 970 exact duplicates |
+| Exclusions (flagged) | 19 invalid dates (1899); 2,247 articles whose only date is the June/July 2020 crawl date (93% sports, mostly from the Skorer site; article ids indicate publication in roughly 2009–2019, exact dates unknown); 970 exact duplicates |
 | Split | `finetune` 1997–2007 (45,384) · `stream` 2008–2019 (32,787) |
 
 | label | finetune (1997–2007) | stream (2008–2019) |
@@ -44,8 +44,10 @@ drift**.
 | Kültür-Sanat | 715 | 342 |
 
 The stream drifts strongly: `Teknoloji-Bilim` is practically absent before 2008 and makes up 33–42% of all articles
-in 2017–2018, the shares of `Ekonomi`, `Spor` and `Dünya` shrink, `Gündem` grows (`figures/label_drift.png`), and the
-vocabulary of each class changes over time (`figures/wordclouds_ekonomi.png`).
+in 2017–2018, the shares of `Ekonomi` and `Dünya` shrink and `Gündem` grows (`figures/label_drift.png`), and the
+vocabulary of each class changes over time (`figures/wordclouds_ekonomi.png`). (The lower `Spor` share after 2010 is
+partly caused by excluding the crawl-dated sports articles above.) The input also changes: the summary repeats the
+title for 30% of the `finetune` items but for only 0.2% of the `stream` items.
 
 **Load it** in one line:
 
@@ -69,18 +71,21 @@ python scripts/prepare_thd_temporal.py --orig-dir data/original --out-dir data
 
 ## Method and protocol
 
-Same protocol as LLM-OFA (CIKM 2025):
+Protocol as described in the LLM-OFA paper (CIKM 2025), with the prequential window adapted to the 12.5× shorter stream:
 
-* **Settings.** *pretrained*: the Hugging Face checkpoint, classification head calibrated with one pass over a random
-  1% of the stream (removed from the stream afterwards); *fine-tuned*: trained on 1997–2007 (90/10 split, 3 epochs,
-  lr 5e-5, best epoch by validation loss).
+* **Settings.** *pretrained*: the Hugging Face checkpoint with a new classification head; the whole model is lightly
+  calibrated with one pass over a random 1% of the stream (328 items; AdamW, lr 2e-5, batch size = model batch size / 4),
+  and these items are then removed from the stream; the same calibrated model is the starting point of Static, OFA and
+  OFA-Adapt. *fine-tuned*: trained on 1997–2007 (90/10 split, 3 epochs, lr 5e-5, best epoch by validation loss).
 * **Configurations.** *Static* (no updates) · *OFA* (test-then-train, AdamW, lr 2e-5) · *OFA-Adapt* (test-then-train
   with Adaptimizer: lr 2e-5, squared-gradient window w = 10, slow-weight EMA rate ρ = 0.1; predictions with the slow
   weights; drift score = cosine distance between fast and slow weights; slow weights re-synchronised when the drift
   score exceeds twice its running mean).
-* **Input.** `title + ". " + summary`, max 160 sub-word tokens.
-* **Metrics.** accuracy, macro-F1 over the whole stream; prequential accuracy over consecutive windows of 200 items
-  (and the worst window).
+* **Input.** `title + ". " + summary`, max 160 sub-word tokens (truncates <1% of the inputs); the summary is dropped
+  when it repeats the title, and the `". "` becomes a single space when the title already ends in `. ! ? … : ; " '`.
+* **Metrics.** accuracy and macro-F1 over the whole stream; worst-case accuracy = minimum prequential accuracy over a
+  sliding window of the last 2,000 items (the paper's window); the curves in the figures use consecutive 200-item
+  windows (~164 points) because the Turkish stream (32,787 items) is 12.5× shorter than the English one.
 
 | family | Turkish checkpoint | batch size |
 |---|---|---:|
@@ -91,12 +96,73 @@ Same protocol as LLM-OFA (CIKM 2025):
 | RoBERTa | [`TURKCELL/roberta-base-turkish-uncased`](https://huggingface.co/TURKCELL/roberta-base-turkish-uncased) | 32 |
 | DeBERTa | [`microsoft/mdeberta-v3-base`](https://huggingface.co/microsoft/mdeberta-v3-base) (multilingual; no Turkish DeBERTa exists) | 8 |
 
-Uncased checkpoints receive Turkish-aware lower-casing (`I → ı`, `İ → i`); their tokenizers' built-in lower-casing
-turns `İ` into an unknown token.
+Uncased checkpoints receive Turkish-aware lower-casing (`I → ı`, `İ → i`): the ALBERT tokenizer's own lower-casing
+maps `İ` to `i` + `<unk>` and `I` to `i`, and the TURKCELL RoBERTa tokenizer (byte-level BPE) does no lower-casing at
+all although its vocabulary was learned from lower-cased text.
 
 ## Results
 
-<!-- RESULTS -->
+All numbers are computed over the full 2008–2019 stream (32,787 items; 32,459 in the pretrained setting after
+removing the calibration sample) with the English hyper-parameters unchanged. Per-run metrics, predictions and the
+aggregated tables are in `results/`.
+
+**Accuracy (%)** — columns: pretrained (Static, OFA, OFA-Adapt) | fine-tuned (Static, OFA, OFA-Adapt)
+
+| Model | Static | OFA | OFA-Adapt | Static | OFA | OFA-Adapt |
+|---|---:|---:|---:|---:|---:|---:|
+| ALBERT | 44.47 | 70.85 | **72.38** | 55.17 | 73.71 | **74.65** |
+| BERT | 35.10 | 70.82 | **74.30** | 63.73 | 77.03 | **77.58** |
+| DeBERTa | 35.10 | 68.10 | **70.60** | 52.44 | 74.83 | **76.03** |
+| DistilBERT | 35.09 | **61.46** | 59.17 | 54.74 | 73.00 | **73.31** |
+| ELECTRA | 35.10 | 69.36 | **69.76** | 51.99 | 75.62 | **76.34** |
+| RoBERTa | 35.11 | **68.01** | 67.88 | 57.92 | **74.22** | 74.18 |
+| *Mean* | 36.66 | 68.10 | **69.02** | 56.00 | 74.73 | **75.35** |
+
+**Macro-F1 (%)** — columns: pretrained (Static, OFA, OFA-Adapt) | fine-tuned (Static, OFA, OFA-Adapt)
+
+| Model | Static | OFA | OFA-Adapt | Static | OFA | OFA-Adapt |
+|---|---:|---:|---:|---:|---:|---:|
+| ALBERT | 17.18 | 60.25 | **61.33** | 46.61 | 65.94 | **66.59** |
+| BERT | 5.20 | 58.41 | **64.15** | 54.75 | 70.04 | **70.64** |
+| DeBERTa | 5.20 | 56.16 | **58.92** | 41.89 | 67.70 | **69.04** |
+| DistilBERT | 5.23 | **45.26** | 41.80 | 43.19 | 63.76 | **64.23** |
+| ELECTRA | 5.20 | 56.26 | **56.94** | 41.28 | 68.31 | **69.12** |
+| RoBERTa | 5.21 | **53.21** | 52.91 | 47.78 | **65.46** | 65.17 |
+| *Mean* | 7.20 | 54.92 | **56.01** | 45.92 | 66.87 | **67.46** |
+
+![Prequential accuracy and drift score](figures/stream_accuracy_drift.png)
+
+*Top: mean prequential accuracy of the six models (consecutive 200-item windows, 3-window moving average).
+Bottom: Adaptimizer's drift score (cosine distance between fast and slow weights, relative to each model's mean,
+log scale).*
+
+**Key observations**
+
+* **Strong natural drift.** Fine-tuned Static models reach 72.2% accuracy on held-out 1997–2007 data but only 56.0%
+  on the 2008–2019 stream, falling to 47–51% in 2017–2018 when `Teknoloji-Bilim` surges (Static F1 on that class: 36%).
+* **Online adaptation is essential.** OFA raises the accuracy of fine-tuned models by +18.7 points (macro-F1 +21.0)
+  and learns the emerging class (`Teknoloji-Bilim` F1 ≈ 95%); on the English 1M-News stream the same gain was +0.65.
+* **Adaptimizer adds a consistent margin with unchanged hyper-parameters:** +0.62 accuracy / +0.59 macro-F1 over
+  AdamW for fine-tuned models (5 of 6 models) and +0.92 / +1.08 for pretrained models (4 of 6). Averaged over the
+  models it is ahead of AdamW in every year of the stream (fine-tuned) and adapts faster at the start of the stream
+  (pretrained, 2008: 40.4% vs 36.6%). Worst-case accuracy (2,000-item sliding window): +0.52 (fine-tuned, 3 of 6)
+  and +3.89 (pretrained, 5 of 6).
+* **Caveat (pretrained setting).** The 1% calibration sample is only 328 items here (4,113 in English), so 5 of the 6
+  pretrained Static models predict the majority class (`Gündem`, 35.1% of the stream); gains over Static in that
+  setting mostly reflect learning from the stream itself.
+
+**English (1M-News) vs Turkish (THD-Temporal)** — mean over the six models, absolute points:
+
+| Setting | Metric | OFA − Static (EN) | OFA − Static (TR) | OFA-Adapt − OFA (EN) | OFA-Adapt − OFA (TR) |
+|---|---|---:|---:|---:|---:|
+| fine-tuned | accuracy | +0.65 | +18.73 | +0.29 | +0.62 |
+| fine-tuned | macro-F1 | +0.93 | +20.95 | +0.28 | +0.59 |
+| pretrained | accuracy | +14.26 | +31.44 | +0.75 | +0.92 |
+| pretrained | macro-F1 | +22.77 | +47.72 | +0.80 | +1.08 |
+
+English values are copied from LLM-OFA (CIKM 2025) Table 2. In the released English runs the pretrained OFA/OFA-Adapt
+models started from an uncalibrated head on the full stream and the pretrained Static model was scored without the
+first 4,113 stream items; the Turkish runs follow the protocol as described in the paper.
 
 ## Reproduce
 

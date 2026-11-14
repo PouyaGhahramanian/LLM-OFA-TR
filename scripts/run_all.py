@@ -43,6 +43,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gpus", nargs="+", default=["0"])
     ap.add_argument("--models", nargs="+", default=MODEL_ORDER)
+    ap.add_argument("--hf-home", default=None, help="optional Hugging Face cache dir for the jobs (default: inherit)")
     args = ap.parse_args()
 
     logs = REPO / "logs"
@@ -71,7 +72,8 @@ def main():
     def worker(gpu):
         env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(gpu), CUDA_DEVICE_ORDER="PCI_BUS_ID",
                    TOKENIZERS_PARALLELISM="false")
-        env.setdefault("HF_HOME", "/data/Pouya-data/hf_cache")
+        if args.hf_home:
+            env["HF_HOME"] = args.hf_home
         while True:
             j, more = next_job()
             if j is None:

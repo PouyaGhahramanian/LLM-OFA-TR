@@ -36,7 +36,7 @@ configs:
 Milliyet.com between 1997 and 2019**, labelled with **10 news categories**. It is designed for studying
 **concept drift, online (stream) learning and continual learning** of Turkish language models: the vocabulary and the
 category distribution change strongly over the two decades (e.g. *Teknoloji-Bilim* is almost absent before 2008 and
-reaches >30% of the articles in 2017–2018).
+reaches >30% of the articles in 2017–2018; the shares of *Ekonomi* and *Dünya* shrink while *Gündem* grows).
 
 > **Credit.** THD-Temporal is a cleaned, re-documented derivative of the
 > **Turkish News Corpus (Türkçe Haber Derlemi)** collected by **Ömer Gözüaçık** for the *Açık Kaynak Hackathon
@@ -55,7 +55,7 @@ Kaggle: <https://www.kaggle.com/datasets/{KAGGLE_ID}>
 | Original text restored | The filtered file is lower-cased with numbers/punctuation removed; the original title, summary and body are restored from the raw scrape (`milliyet_derlem.csv.gz`) by joining on `link` (100% match). |
 | Dates repaired | In the filtered file, day and month are swapped for every date with day ≤ 12 ({N_DATE_FIX:,} articles); dates are re-parsed from the raw `dd.mm.yyyy` strings. |
 | 10-class label | `Ege` (regional edition), `Pazar` and `Cumartesi` (weekend supplements) are not topical and are merged into **`Diğer`**; the original 12-class `category` and the Milliyet section `category_original` are kept. |
-| Quality flags | 19 invalid dates (1899), the partial out-of-range year 2020 ({N_2020:,} articles, 93% sports) and {N_DUP:,} exact duplicate articles are excluded from the benchmark (kept, flagged, in the `full` config). |
+| Quality flags | Excluded from the benchmark but kept, flagged, in the `full` config: 19 invalid dates (1899); {N_2020:,} articles whose only date is the June/July 2020 crawl date (93% sports, mostly from the Skorer site; article ids indicate publication in roughly 2009–2019, exact dates unknown; `exclusion = out_of_range_year`, their `date` is the crawl date); {N_DUP:,} exact duplicate articles. |
 | Benchmark split | Chronological: **`finetune`** = 1997–2007 ({N_FT:,}), **`stream`** = 2008–2019 ({N_ST:,}), sorted by date. |
 
 ## Label distribution
@@ -71,10 +71,10 @@ of the items are opinion columns (`is_column`).
 |---|---|
 | `id` | stable identifier (`thd-<row of the original filtered file>`) |
 | `date`, `year` | publication date (YYYY-MM-DD, repaired) and year |
-| `title`, `summary`, `news` | original headline, summary (equals the title for ~17% of the items) and full text |
+| `title`, `summary`, `news` | original headline, summary (repeats the title for 17.5% of the items: 30% of `finetune`, 0.2% of `stream`) and full text |
 | `label` | 10-class target: Diğer, Dünya, Ekonomi, Gündem, Kültür-Sanat, Magazin, Siyaset, Spor, Teknoloji-Bilim, Yaşam |
 | `category` | original 12-class label of the source corpus |
-| `category_original` | Milliyet section / sub-category (107 values) |
+| `category_original` | Milliyet section / sub-category ({N_CATORIG_BENCH} values in the benchmark, {N_CATORIG_FULL} in the `full` config) |
 | `link`, `url` | relative Milliyet path and full URL |
 | `is_column`, `author` | opinion column flag and columnist slug |
 | `date_repaired` | the date in the source file had day/month swapped |
@@ -98,7 +98,8 @@ path = kagglehub.dataset_download("{KAGGLE_ID}")
 df = pd.read_parquet(f"{path}/thd_temporal.parquet")
 ```
 
-Model input used in our experiments: `title + ". " + summary` (summary skipped when it repeats the title).
+Model input used in our experiments: `title + ". " + summary`; the summary is skipped when it repeats the title, and the
+`". "` becomes a single space when the title already ends in `. ! ? … : ; " '`.
 
 ## Benchmark: on-the-fly adaptation (OFA) of Turkish LLMs
 
