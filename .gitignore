@@ -1,0 +1,13 @@
+# large / regenerable artefacts
+data/*.parquet
+data/*.csv.gz
+models/
+logs/
+hub_export/
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+.DS_Store
+._*

@@ -1,0 +1,11 @@
+torch>=2.6
+transformers>=4.45
+accelerate>=0.26
+scikit-learn
+pandas
+numpy
+pyarrow
+sentencepiece
+protobuf
+matplotlib
+wordcloud

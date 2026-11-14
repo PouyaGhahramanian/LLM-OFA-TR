@@ -1,0 +1,104 @@
+{
+  "source": "https://github.com/ogozuacik/turkce-haber-derlemi (MIT, (c) 2020 Ömer Gözüaçık)",
+  "n_filtered_original": 81407,
+  "n_raw_original": 110220,
+  "dates_repaired_day_month_swap": 29427,
+  "dates_other_mismatch": 0,
+  "excluded": {
+    "out_of_range_year": 2247,
+    "duplicate": 970,
+    "invalid_date": 19
+  },
+  "n_benchmark": 78171,
+  "split_sizes": {
+    "finetune": 45384,
+    "stream": 32787
+  },
+  "label_counts": {
+    "Gündem": 21017,
+    "Siyaset": 14518,
+    "Ekonomi": 11157,
+    "Diğer": 8611,
+    "Spor": 8548,
+    "Dünya": 4785,
+    "Magazin": 3780,
+    "Teknoloji-Bilim": 3096,
+    "Yaşam": 1602,
+    "Kültür-Sanat": 1057
+  },
+  "label_counts_by_split": {
+    "finetune": {
+      "Gündem": 9502,
+      "Siyaset": 9325,
+      "Ekonomi": 8701,
+      "Spor": 6335,
+      "Diğer": 6010,
+      "Dünya": 2971,
+      "Magazin": 1001,
+      "Yaşam": 770,
+      "Kültür-Sanat": 715,
+      "Teknoloji-Bilim": 54
+    },
+    "stream": {
+      "Gündem": 11515,
+      "Siyaset": 5193,
+      "Teknoloji-Bilim": 3042,
+      "Magazin": 2779,
+      "Diğer": 2601,
+      "Ekonomi": 2456,
+      "Spor": 2213,
+      "Dünya": 1814,
+      "Yaşam": 832,
+      "Kültür-Sanat": 342
+    }
+  },
+  "yearly": {
+    "min": 1878,
+    "min_year": 1997,
+    "max": 6703,
+    "max_year": 2006,
+    "mean": 3398.7,
+    "per_year": {
+      "1997": 1878,
+      "1998": 2229,
+      "1999": 2489,
+      "2000": 3799,
+      "2001": 3914,
+      "2002": 4333,
+      "2003": 3736,
+      "2004": 4384,
+      "2005": 5342,
+      "2006": 6703,
+      "2007": 6577,
+      "2008": 3043,
+      "2009": 2347,
+      "2010": 3203,
+      "2011": 2661,
+      "2012": 2644,
+      "2013": 2492,
+      "2014": 2390,
+      "2015": 2152,
+      "2016": 2080,
+      "2017": 3148,
+      "2018": 4181,
+      "2019": 2446
+    }
+  },
+  "columns_share": 0.2887,
+  "summary_equals_title": 13713,
+  "label_map": {
+    "Gündem": "Gündem",
+    "Siyaset": "Siyaset",
+    "Ekonomi": "Ekonomi",
+    "Spor": "Spor",
+    "Dünya": "Dünya",
+    "Magazin": "Magazin",
+    "Teknoloji_Bilim": "Teknoloji-Bilim",
+    "Yaşam": "Yaşam",
+    "Kültür_Sanat": "Kültür-Sanat",
+    "Ege": "Diğer",
+    "Pazar": "Diğer",
+    "Cumartesi": "Diğer"
+  },
+  "last_finetune_year": 2007
+}
