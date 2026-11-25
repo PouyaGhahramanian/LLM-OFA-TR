@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 """On-the-fly adaptation (OFA) stream evaluation on THD-Temporal (2008-2019 stream).
 
-Configurations (same protocol as LLM-OFA, CIKM 2025):
+Configurations (based on the protocol of the LLM-OFA paper, CIKM 2025; the input, the calibration size, the
+prequential window and the drift-triggered re-synchronisation below differ from the paper):
   static     model only predicts, never updated
   ofa        test-then-train: each batch is predicted, then its labels are revealed and the model is updated
              with AdamW (lr 2e-5)
   ofa-adapt  same, but updated with Adaptimizer (lr 2e-5, window w=10, slow update rate rho=0.1, eps 1e-8).
              Predictions use the slow weights, updates the fast weights. Drift score = cosine distance between
              fast and slow weights; when it exceeds `--drift-threshold` x its running mean (after 10 steps) the
-             slow weights are re-synchronised to the fast weights (as in the LLM-OFA runs, threshold 2).
+             slow weights are re-synchronised to the fast weights (threshold 2, as in most pretrained LLM-OFA runs).
 Settings:
-  pretrained the Hugging Face checkpoint; the classification head is calibrated with one pass over a random 1%
-             of the stream (those items are then removed from the stream)
+  pretrained the Hugging Face checkpoint with a new classification head; the whole model (encoder + head) is lightly
+             calibrated with one pass over a random 1% of the stream (those items are then removed from the stream)
   finetuned  checkpoint produced by scripts/finetune.py on 1997-2007
 
 Example:
@@ -112,7 +113,7 @@ def main():
                         max_length=args.max_length, return_tensors="pt")
         return {k: v.to(device) for k, v in enc.items()}
 
-    # ---------------- pretrained: calibrate the classification head on a random 1% of the stream
+    # ---------------- pretrained: light full-model calibration on a random 1% of the stream
     n_calib = 0
     t_start = time.time()
     if args.setting == "pretrained":
